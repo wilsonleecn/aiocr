@@ -1,3 +1,12 @@
+import openai
+import base64
+import os
+import sys
+import json
+
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode("utf-8")
 def analyze_receipt(image_path):
     import math
 
@@ -63,3 +72,11 @@ def analyze_receipt(image_path):
     print(f"Output tokens:   {output_tokens}")
     print(f"Total tokens:    {total_tokens}")
     print(f"Estimated cost:  ${total_cost:.6f} USD")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python receipt_parser.py <image_path>")
+        sys.exit(1)
+
+    image_path = sys.argv[1]
+    analyze_receipt(image_path)
