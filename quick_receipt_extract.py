@@ -9,7 +9,13 @@ LANG = 'en'                # 中文收据用 'ch'
 ocr = PaddleOCR(lang=LANG, use_angle_cls=True, show_log=False)
 raw = ocr.ocr(IMG, cls=True)
 
-lines = [''.join([w[0] for w in line]) for line in sum(raw, [])]
+for line in sum(raw, []):
+    print("Line:", line)
+    for w in line:
+        print("  w:", w, "type:", type(w))
+
+# lines = [''.join([w[0] for w in line]) for line in sum(raw, [])]
+lines = [''.join(str(w[0])[0] for w in line if w and isinstance(w[0], (str, list))) for line in sum(raw, [])]
 
 # --- 粗提取 ---
 def find(patterns):
