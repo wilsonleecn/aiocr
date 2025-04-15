@@ -5,6 +5,17 @@ import sys
 import json
 import re
 
+# 使用 GPT-4 Turbo 分析收据图像
+
+# 强制统一 JSON 键名（通过 Prompt 限定 + 后处理标准化）
+
+# 稳定提取 items，不论 key 是否被乱写
+
+# 使用正则提取 JSON 区块
+
+# 自动猜测商品全称和品牌名
+
+# 打印 token 用量和费用估算
 
 def encode_image_to_base64(image_path):
     with open(image_path, "rb") as img_file:
@@ -21,15 +32,53 @@ def get_openai_client():
 
 
 def extract_json_block(text):
-    """Tries to extract a JSON block from text using regex."""
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
         return match.group(0)
     return None
 
 
+def normalize_keys(data):
+    """Standardize possible variations of JSON keys."""
+    mapping = {
+        "Items": "items",
+        "Purchased Items": "items",
+        "products": "items",
+        "Date": "datetime",
+        "date": "datetime",
+        "store_info": "store",
+        "Store Info": "store",
+        "Cashier": "cashier",
+        "Total Items": "total_items"
+    }
+
+    normalized = {}
+    for key, value in data.items():
+        std_key = mapping.get(key.strip(), key.strip())
+        normalized[std_key] = value
+    return normalized
+
+
 def analyze_receipt_image(openai, base64_image):
     print("📷 Analyzing receipt image...")
+
+    strict_prompt = (
+        "Please analyze this Costco receipt image and extract the information below "
+        "using **exactly** these keys. Do not change key names. Return valid JSON only:\n\n"
+        "{\n"
+        "  \"store\": {\"name\": string, \"address\": string},\n"
+        "  \"datetime\": string,\n"
+        "  \"cashier\": string,\n"
+        "  \"items\": [\n"
+        "    {\"name\": string, \"quantity\": optional number, \"price\": number}\n"
+        "  ],\n"
+        "  \"subtotal\": number,\n"
+        "  \"tax\": {\"total\": number, \"breakdown\": optional object},\n"
+        "  \"total\": number,\n"
+        "  \"total_items\": number\n"
+        "}\n\n"
+        "Respond with only valid JSON. No explanations or extra text."
+    )
 
     response = openai.chat.completions.create(
         model="gpt-4-turbo",
@@ -37,26 +86,10 @@ def analyze_receipt_image(openai, base64_image):
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "This is a photo of a Costco receipt. "
-                            "Please extract the following in **valid JSON** format:\n"
-                            "- Store name and address\n"
-                            "- Date and time\n"
-                            "- Cashier/operator name\n"
-                            "- A list of purchased items (name, quantity if available, price)\n"
-                            "- Subtotal, tax (with breakdown), and total\n"
-                            "- Total number of items\n\n"
-                            "Respond with JSON only. No explanations or headings. Return a valid JSON object."
-                        )
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }
+                    {"type": "text", "text": strict_prompt},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                    }}
                 ]
             }
         ],
@@ -66,7 +99,7 @@ def analyze_receipt_image(openai, base64_image):
 
 
 def guess_full_product_names(openai, abbreviated_items):
-    prompt_dict = {abbreviated_items["name"]: None for item in abbreviated_items if item.get("name")}
+    prompt_dict = {item["name"]: None for item in abbreviated_items if item.get("name")}
     if not prompt_dict:
         print("⚠️ No abbreviated item names found for guessing.")
         return
@@ -80,7 +113,7 @@ def guess_full_product_names(openai, abbreviated_items):
                 "content": (
                     "These are abbreviated item names from a Costco receipt. "
                     "Please guess their full product names and brand. "
-                    "Respond only with valid JSON (no extra comments or explanations):\n\n"
+                    "Respond only with valid JSON:\n\n"
                     + json.dumps(prompt_dict, indent=2)
                 )
             }
@@ -108,7 +141,6 @@ def analyze_receipt(image_path):
     openai_client = get_openai_client()
     base64_image = encode_image_to_base64(image_path)
 
-    # Step 1: Analyze receipt
     response = analyze_receipt_image(openai_client, base64_image)
 
     result_text = response.choices[0].message.content
@@ -128,7 +160,6 @@ def analyze_receipt(image_path):
     print(f"Total tokens:    {total_tokens}")
     print(f"Estimated cost:  ${total_cost:.6f} USD")
 
-    # Step 2: Extract JSON block
     json_str = extract_json_block(result_text)
     if not json_str:
         print("\n❌ Could not find valid JSON in GPT response.\nRaw content:\n", result_text)
@@ -136,16 +167,17 @@ def analyze_receipt(image_path):
 
     try:
         result_json = json.loads(json_str)
-        print("\n🧾 Receipt Data:\n")
-        print(json.dumps(result_json, indent=2))
+        normalized_result = normalize_keys(result_json)
 
-        # Step 3: Guess product names
-        items = result_json.get("Items", [])
+        print("\n🧾 Receipt Data:\n")
+        print(json.dumps(normalized_result, indent=2))
+
+        items = normalized_result.get("items", [])
         if items:
             guess_full_product_names(openai_client, items)
 
     except Exception as e:
-        print("\n❌ Failed to parse extracted JSON:", e)
+        print("\n❌ Failed to parse or normalize JSON:", e)
         print("Raw JSON text:\n", json_str)
 
 
