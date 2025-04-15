@@ -66,7 +66,7 @@ def analyze_receipt_image(openai, base64_image):
 
 
 def guess_full_product_names(openai, abbreviated_items):
-    prompt_dict = {item["name"]: None for item in abbreviated_items if item.get("name")}
+    prompt_dict = {abbreviated_items["name"]: None for item in abbreviated_items if item.get("name")}
     if not prompt_dict:
         print("⚠️ No abbreviated item names found for guessing.")
         return
@@ -140,7 +140,7 @@ def analyze_receipt(image_path):
         print(json.dumps(result_json, indent=2))
 
         # Step 3: Guess product names
-        items = result_json.get("items", [])
+        items = result_json.get("Items", [])
         if items:
             guess_full_product_names(openai_client, items)
 
