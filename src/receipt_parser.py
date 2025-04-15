@@ -63,7 +63,7 @@ def analyze_receipt_image(openai, base64_image):
     print("📷 Analyzing receipt image...")
 
     strict_prompt = (
-        "Please analyze this Costco receipt image and extract the information below "
+        "Please analyze this receipt image and extract the information below "
         "using **exactly** these keys. Do not change key names. Return valid JSON only:\n\n"
         "{\n"
         "  \"store\": {\"name\": string, \"address\": string},\n"
@@ -111,7 +111,7 @@ def guess_full_product_names(openai, abbreviated_items):
             {
                 "role": "user",
                 "content": (
-                    "These are abbreviated item names from a Costco receipt. "
+                    "These are abbreviated item names from a receipt. "
                     "Please guess their full product names and brand. "
                     "Respond only with valid JSON:\n\n"
                     + json.dumps(prompt_dict, indent=2)
