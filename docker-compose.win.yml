@@ -1,0 +1,22 @@
+services:
+  aiocr:
+    image: aiocr:latest
+    container_name: aiocr
+    restart: always
+    working_dir: /home/work/aiocr
+    env_file:
+      - .env
+    volumes:
+      - ./src:/home/work/aiocr
+      - /usr/share/zoneinfo/America/Los_Angeles:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./samples:/home/work/samples
+    # ports:
+    #   - "5000:5000"
+    # Keep container alive with tail -f /dev/null if no other command is needed
+    command: tail -f /dev/null
+    # Alternatively, uncomment one of these if you need to run a specific service:
+    # command: python web_server.py
+    # command: python gradio_chat.py
+    environment:
+      - TZ=America/Los_Angeles
